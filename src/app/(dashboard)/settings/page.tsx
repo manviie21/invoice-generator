@@ -29,6 +29,8 @@ export default function SettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signatureSaving, setSignatureSaving] = useState(false);
+  const [signatureMessage, setSignatureMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null
   );
@@ -56,7 +58,18 @@ export default function SettingsPage() {
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
         if (data && !data.error) {
-          setForm({
+          // If server returns empty signature, preserve locally cached signature
+          let cachedSignature = "";
+          try {
+            const cached = localStorage.getItem("manviie_sender_settings");
+            if (cached) cachedSignature = JSON.parse(cached).signatureImageUrl || "";
+          } catch {
+            // ignore
+          }
+
+          const finalSignature = data.signatureImageUrl || cachedSignature || "";
+
+          const updatedData = {
             name: data.name || "Manvi Sharma",
             address: data.address || "A-429, A Block Sector 47\nNoida, Uttar Pradesh 201303\nIndia",
             pan: data.pan || "OVFPS5255B",
@@ -65,10 +78,12 @@ export default function SettingsPage() {
             ifsc: data.ifsc || "HDFC0002674",
             bankName: data.bankName || "HDFC Bank",
             upiId: data.upiId || "manvi@okhdfcbank",
-            signatureImageUrl: data.signatureImageUrl || "",
-          });
+            signatureImageUrl: finalSignature,
+          };
+
+          setForm(updatedData);
           if (typeof window !== "undefined") {
-            localStorage.setItem("manviie_sender_settings", JSON.stringify(data));
+            localStorage.setItem("manviie_sender_settings", JSON.stringify(updatedData));
           }
         }
       })
@@ -82,10 +97,13 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSignatureSaving(true);
+    setSignatureMessage(null);
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new window.Image();
-      img.onload = () => {
+      img.onload = async () => {
         const maxWidth = 400;
         let width = img.width;
         let height = img.height;
@@ -101,7 +119,10 @@ export default function SettingsPage() {
         canvas.height = height;
 
         const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx) {
+          setSignatureSaving(false);
+          return;
+        }
 
         ctx.drawImage(img, 0, 0, width, height);
 
@@ -109,18 +130,66 @@ export default function SettingsPage() {
         const mimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
         const compressedDataUrl = canvas.toDataURL(mimeType, 0.8);
 
-        setForm((prev) => ({
-          ...prev,
+        const updated = {
+          ...form,
           signatureImageUrl: compressedDataUrl,
-        }));
+        };
+
+        setForm(updated);
+
+        // Immediately cache to browser storage
+        if (typeof window !== "undefined") {
+          localStorage.setItem("manviie_sender_settings", JSON.stringify(updated));
+        }
+
+        // Auto-save to database immediately so user doesn't have to scroll and submit
+        try {
+          const res = await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updated),
+          });
+          const resData = await res.json().catch(() => null);
+          if (res.ok) {
+            setSignatureMessage({ type: "success", text: "Signature saved to database!" });
+            setTimeout(() => setSignatureMessage(null), 4000);
+          } else {
+            const errDetail = resData?.details || resData?.error || `Status ${res.status}`;
+            setSignatureMessage({ type: "error", text: `Cloud save pending: ${errDetail}` });
+          }
+        } catch {
+          setSignatureMessage({ type: "success", text: "Signature saved locally in browser!" });
+          setTimeout(() => setSignatureMessage(null), 4000);
+        } finally {
+          setSignatureSaving(false);
+        }
       };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
 
-  const removeSignature = () => {
-    setForm((prev) => ({ ...prev, signatureImageUrl: "" }));
+  const removeSignature = async () => {
+    const updated = { ...form, signatureImageUrl: "" };
+    setForm(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("manviie_sender_settings", JSON.stringify(updated));
+    }
+
+    setSignatureSaving(true);
+    try {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      setSignatureMessage({ type: "success", text: "Signature removed!" });
+      setTimeout(() => setSignatureMessage(null), 3000);
+    } catch {
+      // ignore
+    } finally {
+      setSignatureSaving(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -153,9 +222,10 @@ export default function SettingsPage() {
       }
 
       if (!res.ok) {
+        const errDetail = data?.details || data?.error || `Server error (${res.status})`;
         setMessage({
-          type: "success",
-          text: "Saved to browser memory! (To save permanently to cloud DB, connect Turso in Vercel)",
+          type: "error",
+          text: `Failed to save to database: ${errDetail}`,
         });
       } else {
         setMessage({ type: "success", text: "Settings saved successfully!" });
@@ -400,29 +470,46 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-3">
-              <label className="btn-tactile inline-flex items-center gap-2 px-5 py-2.5 bg-[#140f12] hover:bg-[#e86c54] text-white text-[11px] uppercase tracking-[0.18em] font-medium rounded-full cursor-pointer transition-colors duration-200">
-                <UploadCloud className="w-3.5 h-3.5" />
-                <span>Upload New Signature</span>
-                <input
-                  type="file"
-                  accept="image/png, image/jpeg"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-              </label>
+              <div className="flex items-center gap-3">
+                <label className="btn-tactile inline-flex items-center gap-2 px-5 py-2.5 bg-[#140f12] hover:bg-[#e86c54] text-white text-[11px] uppercase tracking-[0.18em] font-medium rounded-full cursor-pointer transition-colors duration-200">
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>{signatureSaving ? "Saving..." : "Upload New Signature"}</span>
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg"
+                    className="hidden"
+                    disabled={signatureSaving}
+                    onChange={handleImageUpload}
+                  />
+                </label>
 
-              {form.signatureImageUrl && (
-                <button
-                  type="button"
-                  onClick={removeSignature}
-                  className="block text-xs text-red-600 hover:text-red-700 font-medium"
+                {form.signatureImageUrl && (
+                  <button
+                    type="button"
+                    onClick={removeSignature}
+                    disabled={signatureSaving}
+                    className="text-xs text-red-600 hover:text-red-700 font-medium"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 inline mr-1" />
+                    Remove signature
+                  </button>
+                )}
+              </div>
+
+              {signatureMessage && (
+                <div
+                  className={`text-xs px-3 py-1.5 rounded-lg inline-block font-medium ${
+                    signatureMessage.type === "success"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
                 >
-                  <Trash2 className="w-3.5 h-3.5 inline mr-1" />
-                  Remove signature
-                </button>
+                  {signatureMessage.text}
+                </div>
               )}
+
               <p className="text-xs text-[#140f12]/45">
-                Transparent PNG with dark ink matches the PDF layout best.
+                Transparent PNG with dark ink matches the PDF layout best. Auto-saved immediately upon upload.
               </p>
             </div>
           </div>

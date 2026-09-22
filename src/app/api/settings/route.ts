@@ -89,8 +89,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, message: "Settings saved successfully" });
   } catch (err: unknown) {
     console.error("Failed to save settings:", err);
+    const details = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Failed to save settings" },
+      { error: "Failed to save settings", details },
       { status: 500 }
     );
   }

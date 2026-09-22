@@ -115,6 +115,18 @@ export async function ensureDatabase() {
         // column already exists — safe to ignore
       }
 
+      // Migration guard: ensure signature_image_url and updated_at exist in sender_details
+      try {
+        await client.execute(`ALTER TABLE sender_details ADD COLUMN signature_image_url TEXT;`);
+      } catch {
+        // column already exists — safe to ignore
+      }
+      try {
+        await client.execute(`ALTER TABLE sender_details ADD COLUMN updated_at INTEGER;`);
+      } catch {
+        // column already exists — safe to ignore
+      }
+
       // Pre-seed default sender details if empty
       try {
         const existing = await client.execute(`SELECT id FROM sender_details LIMIT 1;`);
