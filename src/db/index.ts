@@ -2,8 +2,33 @@ import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
 import * as schema from "./schema";
 
-const url = process.env.TURSO_DATABASE_URL || "file:local.db";
-const authToken = process.env.TURSO_AUTH_TOKEN;
+function cleanEnv(val: string | undefined): string | undefined {
+  if (!val) return undefined;
+  const trimmed = val.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+const defaultUrl = isServerless ? "file:/tmp/local.db" : "file:local.db";
+
+const rawUrl =
+  cleanEnv(process.env.TURSO_DATABASE_URL) ||
+  cleanEnv(process.env.invoice_TURSO_DATABASE_URL) ||
+  cleanEnv(process.env.INVOICE_TURSO_DATABASE_URL);
+
+const rawAuthToken =
+  cleanEnv(process.env.TURSO_AUTH_TOKEN) ||
+  cleanEnv(process.env.invoice_TURSO_AUTH_TOKEN) ||
+  cleanEnv(process.env.INVOICE_TURSO_AUTH_TOKEN);
+
+const url = rawUrl || defaultUrl;
+const authToken = rawAuthToken;
 
 export const client = createClient({
   url,
@@ -12,12 +37,13 @@ export const client = createClient({
 
 export const db = drizzle(client, { schema });
 
-// Auto initialize tables if not present (useful for local development & seamless first run)
-let initialized = false;
+// Auto initialize tables if not present with concurrency lock
+let initPromise: Promise<void> | null = null;
 
 export async function ensureDatabase() {
-  if (initialized) return;
-  try {
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS sender_details (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,8 +95,34 @@ export async function ensureDatabase() {
         created_at INTEGER
       );
     `);
-    initialized = true;
-  } catch (err) {
-    console.error("Failed to initialize database tables:", err);
-  }
+
+    // Pre-seed default sender details if empty
+    try {
+      const existing = await client.execute(`SELECT id FROM sender_details LIMIT 1;`);
+      if (existing.rows.length === 0) {
+        await client.execute({
+          sql: `INSERT INTO sender_details (name, address, pan, bank_account_name, bank_account_number, ifsc, bank_name, upi_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          args: [
+            "Manvi Sharma",
+            "A-429, A Block Sector 47\nNoida, Uttar Pradesh 201303\nIndia",
+            "OVFPS5255B",
+            "Manvi Sharma",
+            "50100634081448",
+            "HDFC0002674",
+            "HDFC Bank",
+            "manvi@okhdfcbank",
+            Date.now(),
+          ],
+        });
+      }
+    } catch (seedErr) {
+      console.warn("Could not pre-seed sender details:", seedErr);
+    }
+
+    } catch (err) {
+      console.error("Failed to initialize database tables:", err);
+      initPromise = null;
+    }
+  })();
+  return initPromise;
 }

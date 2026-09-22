@@ -27,6 +27,9 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
   if (!token) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 });
+    }
     const loginUrl = new URL("/login", request.url);
     if (pathname !== "/") {
       loginUrl.searchParams.set("from", pathname);
@@ -38,6 +41,9 @@ export async function middleware(request: NextRequest) {
     await jwtVerify(token, getSecretKey());
     return NextResponse.next();
   } catch {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Session expired. Please log in again." }, { status: 401 });
+    }
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }

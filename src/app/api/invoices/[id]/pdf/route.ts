@@ -49,18 +49,29 @@ export async function GET(
     };
 
     // Fetch sender
-    const senderRows = await db.select().from(senderDetails).limit(1);
-    const sender = senderRows[0] || {
-      name: "Your Business",
-      address: "Your Address",
-      pan: "",
-      bankAccountName: "",
-      bankAccountNumber: "",
-      ifsc: "",
-      bankName: "",
-      upiId: "",
-      signatureImageUrl: null,
-    };
+    let sender: any = null;
+    try {
+      const senderRows = await db.select().from(senderDetails).limit(1);
+      if (senderRows.length > 0) {
+        sender = senderRows[0];
+      }
+    } catch (e) {
+      console.warn("Could not load sender details for PDF, using defaults:", e);
+    }
+
+    if (!sender) {
+      sender = {
+        name: "Manvi Sharma",
+        address: "A-429, A Block Sector 47\nNoida, Uttar Pradesh 201303\nIndia",
+        pan: "OVFPS5255B",
+        bankAccountName: "Manvi Sharma",
+        bankAccountNumber: "50100634081448",
+        ifsc: "HDFC0002674",
+        bankName: "HDFC Bank",
+        upiId: "manvi@okhdfcbank",
+        signatureImageUrl: null,
+      };
+    }
 
     // Parse items if string
     let parsedItems: InvoiceItem[] = [];
