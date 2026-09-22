@@ -13,47 +13,40 @@ import {
 } from "@react-pdf/renderer";
 import type { Invoice, Client, SenderDetails } from "@/lib/types";
 
-// 1. Register Cormorant Garamond (Editorial Luxury Display Font from manviie21.github.io)
+// On Vercel, fonts are served from /public/fonts (static HTTP).
+// Locally, we use the filesystem path via process.cwd().
+const isVercel = !!process.env.VERCEL;
+
+function fontSrc(filename: string): string {
+  if (isVercel) {
+    // Use the deployed public URL — Vercel serves public/ as static assets
+    const siteUrl =
+      process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
+    return `${siteUrl}/fonts/${filename}`;
+  }
+  return path.join(process.cwd(), "public", "fonts", filename);
+}
+
+// 1. Register Cormorant Garamond (Editorial Luxury Display Font)
 Font.register({
   family: "Cormorant Garamond",
   fonts: [
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "CormorantGaramond-Regular.ttf"),
-      fontWeight: "normal",
-    },
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "CormorantGaramond-Bold.ttf"),
-      fontWeight: "bold",
-    },
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "CormorantGaramond-Italic.ttf"),
-      fontStyle: "italic",
-      fontWeight: "normal",
-    },
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "CormorantGaramond-BoldItalic.ttf"),
-      fontStyle: "italic",
-      fontWeight: "bold",
-    },
+    { src: fontSrc("CormorantGaramond-Regular.ttf"), fontWeight: "normal" },
+    { src: fontSrc("CormorantGaramond-Bold.ttf"), fontWeight: "bold" },
+    { src: fontSrc("CormorantGaramond-Italic.ttf"), fontStyle: "italic", fontWeight: "normal" },
+    { src: fontSrc("CormorantGaramond-BoldItalic.ttf"), fontStyle: "italic", fontWeight: "bold" },
   ],
 });
 
-// 2. Register DM Sans (Clean UI / Body Font from manviie21.github.io)
+// 2. Register DM Sans (Clean UI / Body Font)
 Font.register({
   family: "DM Sans",
   fonts: [
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "DMSans-Regular.ttf"),
-      fontWeight: "normal",
-    },
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "DMSans-Medium.ttf"),
-      fontWeight: 500,
-    },
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "DMSans-Bold.ttf"),
-      fontWeight: "bold",
-    },
+    { src: fontSrc("DMSans-Regular.ttf"), fontWeight: "normal" },
+    { src: fontSrc("DMSans-Medium.ttf"), fontWeight: 500 },
+    { src: fontSrc("DMSans-Bold.ttf"), fontWeight: "bold" },
   ],
 });
 
@@ -61,14 +54,8 @@ Font.register({
 Font.register({
   family: "Noto Sans",
   fonts: [
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "NotoSans-Regular.ttf"),
-      fontWeight: "normal",
-    },
-    {
-      src: path.join(process.cwd(), "assets", "fonts", "NotoSans-Bold.ttf"),
-      fontWeight: "bold",
-    },
+    { src: fontSrc("NotoSans-Regular.ttf"), fontWeight: "normal" },
+    { src: fontSrc("NotoSans-Bold.ttf"), fontWeight: "bold" },
   ],
 });
 
