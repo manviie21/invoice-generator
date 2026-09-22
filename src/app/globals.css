@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cream: #faf6f0;
+  --dark: #140f12;
+  --coral: #e86c54;
+  --blush: #f2c4bb;
+  --lilac: #ece3f4;
+  --peach: #fde9dc;
+  --mint: #d7efe6;
+  --butter: #fef2ce;
+  --text-muted: rgba(20, 15, 18, 0.55);
+}
+
+::selection {
+  background: var(--coral);
+  color: #ffffff;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--dark);
+  font-family: var(--font-dm-sans), 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom interactive input & button styling */
+input, textarea, select {
+  accent-color: var(--coral);
+}
+
+/* Emil Kowalski tactile button feel */
+.btn-tactile {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-tactile:active {
+  transform: scale(0.975);
+}
+
+/* Smooth card transitions */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(20, 15, 18, 0.08);
+}
