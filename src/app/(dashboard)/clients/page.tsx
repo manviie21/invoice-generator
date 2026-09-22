@@ -172,18 +172,30 @@ export default function ClientsPage() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      if (res.status === 401) {
+        window.location.href = "/login?from=/clients";
+        return;
+      }
+
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        setError(`Server error (${res.status}): ${res.statusText}`);
+        setSaving(false);
+        return;
+      }
 
       if (!res.ok) {
-        setError(data.error || "Failed to save client");
+        setError(data?.error || `Failed to save client (${res.status})`);
         setSaving(false);
         return;
       }
 
       setIsModalOpen(false);
       loadClients();
-    } catch {
-      setError("Network error occurred");
+    } catch (err: any) {
+      setError(`Network error: ${err?.message || "Could not connect to server"}`);
     } finally {
       setSaving(false);
     }
