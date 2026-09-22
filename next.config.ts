@@ -4,7 +4,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
   // Include font assets in serverless function bundles on Vercel
   outputFileTracingIncludes: {
-    "/api/invoices/[id]/pdf": ["./assets/fonts/**/*", "./assets/**/*"],
+    "/api/**/*": ["./public/fonts/**/*", "./assets/fonts/**/*"],
+    "/api/invoices/[id]/pdf": ["./public/fonts/**/*", "./assets/fonts/**/*"],
   },
 };
 

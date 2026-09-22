@@ -13,20 +13,23 @@ import {
 } from "@react-pdf/renderer";
 import type { Invoice, Client, SenderDetails } from "@/lib/types";
 
-// On Vercel, fonts are served from /public/fonts (static HTTP).
-// Locally, we use the filesystem path via process.cwd().
-const isVercel = !!process.env.VERCEL;
+import fs from "fs";
 
+// Load fonts from local filesystem if available (public/fonts or assets/fonts),
+// falling back to high-reliability jsDelivr CDN if running in a stripped serverless bundle.
 function fontSrc(filename: string): string {
-  if (isVercel) {
-    // Use the deployed public URL — Vercel serves public/ as static assets
-    const siteUrl =
-      process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000";
-    return `${siteUrl}/fonts/${filename}`;
+  const candidates = [
+    path.join(process.cwd(), "public", "fonts", filename),
+    path.join(process.cwd(), "assets", "fonts", filename),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch {
+      // ignore and continue
+    }
   }
-  return path.join(process.cwd(), "public", "fonts", filename);
+  return `https://cdn.jsdelivr.net/gh/manviie21/invoice-generator@main/public/fonts/${filename}`;
 }
 
 // 1. Register Cormorant Garamond (Editorial Luxury Display Font)

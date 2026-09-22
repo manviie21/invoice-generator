@@ -7,6 +7,9 @@ import { eq } from "drizzle-orm";
 import { InvoicePdfDocument } from "@/lib/pdf/InvoicePdfDocument";
 import type { InvoiceItem } from "@/lib/types";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -116,8 +119,9 @@ export async function GET(
     });
   } catch (err: unknown) {
     console.error("PDF generation failed:", err);
+    const details = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Failed to generate PDF invoice" },
+      { error: "Failed to generate PDF invoice", details },
       { status: 500 }
     );
   }
